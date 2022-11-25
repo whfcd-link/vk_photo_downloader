@@ -9,26 +9,23 @@ import com.vk.api.sdk.objects.photos.PhotoAlbumFull;
 import com.vk.api.sdk.objects.photos.PhotoSizes;
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.BufferedInputStream;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.BufferedWriter;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.Reader;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j(topic = "com.whfcd.vk_photo_downloader")
 public class VkPhotoDownloader {
@@ -64,11 +61,10 @@ public class VkPhotoDownloader {
         log.info("Connected as a vk-user with an id {}", userId);
 
         List<PhotoAlbumFull> allAlbumsInfo = getAllAlbumsInfo(userId);
-        List<Integer> desiredAlbumsIds = Arrays.asList(-7, -6, 288888977, 123586411);
 
         log.info("Getting ready to download photos from the following albums:");
         List<PhotoAlbumFull> desiredAlbums = allAlbumsInfo.stream()
-                .filter(x -> desiredAlbumsIds.stream()
+                .filter(x -> Stream.of(-7, -6, 288888977, 123586411)
                         .anyMatch(y -> y.equals(x.getId())))
                 .peek(x -> log.info("   {}, id: {}, size: {}", x.getTitle(), x.getId(), x.getSize()))
                 .collect(Collectors.toList());
@@ -78,8 +74,9 @@ public class VkPhotoDownloader {
 
     private static void downloadPhotos(Map<String, List<String>> photoUrlsByAlbumsMap) {
         int i = 0;
-        byte[] buf = new byte[2048];
+        int successCounter = 0;
         URL url;
+        BufferedImage bufferedImage;
 
         log.info("Downloading photos...");
         for (Map.Entry<String, List<String>> entry : photoUrlsByAlbumsMap.entrySet()) {
@@ -88,39 +85,21 @@ public class VkPhotoDownloader {
             }
 
             for (String photoUrl : entry.getValue()) {
-                ByteArrayOutputStream outputBytes = new ByteArrayOutputStream();
                 try {
                     url = new URL(photoUrl);
-
-                    try (InputStream in = new BufferedInputStream(url.openStream())) {
-                        int n;
-                        while ((n = in.read(buf)) != -1) {
-                            outputBytes.write(buf, 0, n);
-                        }
-                        outputBytes.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                } catch (MalformedURLException e) {
-                    e.printStackTrace();
-                }
-
-                try (FileOutputStream fos = new FileOutputStream("photos/" + entry.getKey() + "/" + i + ".jpg")) {
-                    fos.write(outputBytes.toByteArray());
+                    bufferedImage = ImageIO.read(url);
+                    ImageIO.write(bufferedImage,  "jpg", new File("photos/" + entry.getKey() + "/" + i + ".jpg"));
+                    successCounter++;
                     log.info("   photo {}.jpg downloaded successfully to folder \"{}\"...", i, entry.getKey());
                 } catch (IOException e) {
-                    log.error("   failed to download photo {}.jpg :(((", i);
                     e.printStackTrace();
+                    log.error("   failed to download photo {}.jpg :(((", i);
                 } finally {
                     i++;
                 }
             }
         }
-
-        log.info("Process completed: {} photos were downloaded", photoUrlsByAlbumsMap.values().stream()
-                .map(List::size)
-                .reduce(Integer::sum)
-                .orElse(0));
+        log.info("Process completed: {} photos were downloaded", successCounter);
     }
 
     private static Map<String, List<String>> getUrlsByAlbums(int userId, List<PhotoAlbumFull> desiredAlbums, boolean saveLinksToFile) throws ApiException, ClientException {
