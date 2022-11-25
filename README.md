@@ -1,2 +1,4 @@
-# vk_photo_downloader
-An app to download full photo albums (specified ones) from VK social network
+# VK Photo Downloader
+A java-vased appplication dedicated to download all the photos from specified albums from VK social network.
+
+*Under development*
