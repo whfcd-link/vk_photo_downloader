@@ -30,14 +30,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
-/*
-https://oauth.vk.com/authorize?client_id=51463717&display=page&redirect_uri=https://oauth.vk.com/blank.html&scope=friends,photos&response_type=token&v=5.131
-
-Use that line to get access token (expires in 24h)
-
-Response: https://oauth.vk.com/blank.html#access_token=vk1.a.inQ_alRbvRqG7f8ZRHIH0edzYpbS9W9xeEKHCUF54ARIOIostog_30n_Ycr9xK2NuTlj8SKrmpxtwpmnExnt7CasfA0_iebaFiQUKl2aD3KjqoRzHiXBk0dr5Wq2TQh1U4gvZVpv8P_6-EfvUlLun_g0WIpEgcV2voTFXX87Y4baSUdFJF0vPXM2sSOzYjL8&expires_in=86400&user_id=41014721
-*/
-
 @Slf4j(topic = "com.whfcd.vk_photo_downloader")
 public class VkPhotoDownloader {
     private static final int APP_ID;
@@ -70,7 +62,7 @@ public class VkPhotoDownloader {
         VkApiClient vk = new VkApiClient(transportClient);
         UserActor actor = new UserActor(APP_ID, TOKEN);
 
-        int userId = vk.users().get(actor).execute().get(0).getId();        // 41014721 (?)
+        int userId = vk.users().get(actor).execute().get(0).getId();
         log.info("Connected as a vk-user with an id {}", userId);
 
         log.info("Getting info about all the albums belonging to the user with id {}...", userId);
