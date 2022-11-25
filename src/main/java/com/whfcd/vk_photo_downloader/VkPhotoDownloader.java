@@ -75,7 +75,6 @@ public class VkPhotoDownloader {
     private static void downloadPhotos(Map<String, List<String>> photoUrlsByAlbumsMap) {
         int i = 0;
         int successCounter = 0;
-        URL url;
         BufferedImage bufferedImage;
 
         log.info("Downloading photos...");
@@ -86,8 +85,7 @@ public class VkPhotoDownloader {
 
             for (String photoUrl : entry.getValue()) {
                 try {
-                    url = new URL(photoUrl);
-                    bufferedImage = ImageIO.read(url);
+                    bufferedImage = ImageIO.read(new URL(photoUrl));
                     ImageIO.write(bufferedImage,  "jpg", new File("photos/" + entry.getKey() + "/" + i + ".jpg"));
                     successCounter++;
                     log.info("   photo {}.jpg downloaded successfully to folder \"{}\"...", i, entry.getKey());
