@@ -7,6 +7,7 @@ import com.vk.api.sdk.exceptions.ClientException;
 import com.vk.api.sdk.httpclient.HttpTransportClient;
 import com.vk.api.sdk.objects.photos.PhotoAlbumFull;
 import com.vk.api.sdk.objects.photos.PhotoSizes;
+import com.whfcd.vk_photo_downloader.model.PhotoUrl;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.imageio.ImageIO;
@@ -64,7 +65,7 @@ public class VkPhotoDownloader {
 
         log.info("Getting ready to download photos from the following albums:");
         List<PhotoAlbumFull> desiredAlbums = allAlbumsInfo.stream()
-                .filter(x -> Stream.of(-7, -6, 288888977, 123586411)
+                .filter(x -> Stream.of(-15, -7, -6, 123586411)
                         .anyMatch(y -> y.equals(x.getId())))
                 .peek(x -> log.info("   {}, id: {}, size: {}", x.getTitle(), x.getId(), x.getSize()))
                 .collect(Collectors.toList());
@@ -72,36 +73,50 @@ public class VkPhotoDownloader {
         downloadPhotos(getUrlsByAlbums(userId, desiredAlbums, true));
     }
 
-    private static void downloadPhotos(Map<String, List<String>> photoUrlsByAlbumsMap) {
+    private static void downloadPhotos(Map<String, List<PhotoUrl>> photoUrlsByAlbumsMap) {
         int i = 0;
         int successCounter = 0;
         BufferedImage bufferedImage;
 
         log.info("Downloading photos...");
-        for (Map.Entry<String, List<String>> entry : photoUrlsByAlbumsMap.entrySet()) {
+        for (Map.Entry<String, List<PhotoUrl>> entry : photoUrlsByAlbumsMap.entrySet()) {
             if (new File("photos/" + entry.getKey()).mkdirs()) {
                 log.info("  folder \"{}\" created...", entry.getKey());
             }
 
-            for (String photoUrl : entry.getValue()) {
-                try {
-                    bufferedImage = ImageIO.read(new URL(photoUrl));
-                    ImageIO.write(bufferedImage,  "jpg", new File("photos/" + entry.getKey() + "/" + i + ".jpg"));
-                    successCounter++;
-                    log.info("   photo {}.jpg downloaded successfully to folder \"{}\"...", i, entry.getKey());
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    log.error("   failed to download photo {}.jpg :(((", i);
-                } finally {
-                    i++;
+            if (entry.getValue().size() > 30) {
+                entry.getValue().parallelStream().forEach(photoUrl -> {
+                    try {
+                        BufferedImage bufferedImage1 = ImageIO.read(new URL(photoUrl.getUrl()));
+                        ImageIO.write(bufferedImage1, "jpg", new File("photos/" + entry.getKey() + "/" + photoUrl.getId() + ".jpg"));
+                        log.info("   photo {}.jpg downloaded successfully to folder \"{}\"...", photoUrl.getId(), entry.getKey());
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        log.error("   failed to download photo {}.jpg :(((", photoUrl.getId());
+                    }
+                });
+
+            } else {
+                for (PhotoUrl photoUrl : entry.getValue()) {
+                    try {
+                        bufferedImage = ImageIO.read(new URL(photoUrl.getUrl()));
+                        ImageIO.write(bufferedImage, "jpg", new File("photos/" + entry.getKey() + "/" + i + ".jpg"));
+                        successCounter++;
+                        log.info("   photo {}.jpg downloaded successfully to folder \"{}\"...", i, entry.getKey());
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        log.error("   failed to download photo {}.jpg :(((", i);
+                    } finally {
+                        i++;
+                    }
                 }
             }
         }
         log.info("Process completed: {} photos were downloaded", successCounter);
     }
 
-    private static Map<String, List<String>> getUrlsByAlbums(int userId, List<PhotoAlbumFull> desiredAlbums, boolean saveLinksToFile) throws ApiException, ClientException {
-        Map<String, List<String>> photoUrlsByAlbumsMap = getUrlsByAlbums(userId, desiredAlbums);
+    private static Map<String, List<PhotoUrl>> getUrlsByAlbums(int userId, List<PhotoAlbumFull> desiredAlbums, boolean saveLinksToFile) throws ApiException, ClientException {
+        Map<String, List<PhotoUrl>> photoUrlsByAlbumsMap = getUrlsByAlbums(userId, desiredAlbums);
 
         if (saveLinksToFile) {
             saveUrlsToPhotosToFile(photoUrlsByAlbumsMap);
@@ -110,9 +125,9 @@ public class VkPhotoDownloader {
         return photoUrlsByAlbumsMap;
     }
 
-    private static Map<String, List<String>> getUrlsByAlbums(int userId, List<PhotoAlbumFull> desiredAlbums) throws ApiException, ClientException {
+    private static Map<String, List<PhotoUrl>> getUrlsByAlbums(int userId, List<PhotoAlbumFull> desiredAlbums) throws ApiException, ClientException {
         log.info("Fetching links to photos...");
-        Map<String, List<String>> photoUrlsByAlbumsMap = new HashMap<>();
+        Map<String, List<PhotoUrl>> photoUrlsByAlbumsMap = new HashMap<>();
         int cycles;
 
         for (PhotoAlbumFull photoAlbum : desiredAlbums) {
@@ -152,7 +167,12 @@ public class VkPhotoDownloader {
                         .collect(Collectors.toList()));
             }
 
-            photoUrlsByAlbumsMap.put(photoAlbum.getTitle(), photosList);
+            List<PhotoUrl> indexedPhotoList = new ArrayList<>(photosList.size());
+            for (int i = 0; i < photosList.size(); i++) {
+                indexedPhotoList.add(new PhotoUrl(i, photosList.get(i)));
+            }
+
+            photoUrlsByAlbumsMap.put(photoAlbum.getTitle(), indexedPhotoList);
             log.info("   successfully fetched {} links for album named \"{}\"", photosList.size(), photoAlbum.getTitle());
         }
         return photoUrlsByAlbumsMap;
@@ -172,17 +192,17 @@ public class VkPhotoDownloader {
         return albumsInfo;
     }
 
-    private static void saveUrlsToPhotosToFile(Map<String, List<String>> photoUrlsByAlbumsMap) {
+    private static void saveUrlsToPhotosToFile(Map<String, List<PhotoUrl>> photoUrlsByAlbumsMap) {
         log.info("Saving fetched links to file...");
 
         try (BufferedWriter bw = new BufferedWriter(new FileWriter("output.txt"))) {
-            for (Map.Entry<String, List<String>> entry : photoUrlsByAlbumsMap.entrySet()) {
+            for (Map.Entry<String, List<PhotoUrl>> entry : photoUrlsByAlbumsMap.entrySet()) {
                 try {
                     bw.write(entry.getKey() + "\n");
                     entry.getValue().forEach(photo ->
                             {
                                 try {
-                                    bw.write(photo + "\n");
+                                    bw.write(photo.getUrl() + "\n");
                                 } catch (IOException e) {
                                     e.printStackTrace();
                                 }
