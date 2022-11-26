@@ -70,49 +70,36 @@ public class VkPhotoDownloader {
                 .peek(x -> log.info("   {}, id: {}, size: {}", x.getTitle(), x.getId(), x.getSize()))
                 .collect(Collectors.toList());
 
-        downloadPhotos(getUrlsByAlbums(userId, desiredAlbums, true));
+        downloadAllPhotos(getUrlsByAlbums(userId, desiredAlbums, true));
     }
 
-    private static void downloadPhotos(Map<String, List<PhotoUrl>> photoUrlsByAlbumsMap) {
-        int i = 0;
-        int successCounter = 0;
-        BufferedImage bufferedImage;
+    public static void downloadSinglePhoto(String destinationFolder, PhotoUrl photoUrl) {
+        try {
+            BufferedImage bufferedImage1 = ImageIO.read(new URL(photoUrl.getUrl()));
+            ImageIO.write(bufferedImage1, "jpg", new File("photos/" + destinationFolder + "/" + photoUrl.getId() + ".jpg"));
+            log.info("   photo {}.jpg downloaded successfully to folder \"{}\"...", photoUrl.getId(), destinationFolder);
+        } catch (IOException e) {
+            e.printStackTrace();
+            log.error("   failed to download photo {}.jpg :(((", photoUrl.getId());
+        }
+    }
 
+    private static void downloadAllPhotos(Map<String, List<PhotoUrl>> photoUrlsByAlbumsMap) {
         log.info("Downloading photos...");
         for (Map.Entry<String, List<PhotoUrl>> entry : photoUrlsByAlbumsMap.entrySet()) {
             if (new File("photos/" + entry.getKey()).mkdirs()) {
                 log.info("  folder \"{}\" created...", entry.getKey());
             }
 
-            if (entry.getValue().size() > 30) {
-                entry.getValue().parallelStream().forEach(photoUrl -> {
-                    try {
-                        BufferedImage bufferedImage1 = ImageIO.read(new URL(photoUrl.getUrl()));
-                        ImageIO.write(bufferedImage1, "jpg", new File("photos/" + entry.getKey() + "/" + photoUrl.getId() + ".jpg"));
-                        log.info("   photo {}.jpg downloaded successfully to folder \"{}\"...", photoUrl.getId(), entry.getKey());
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                        log.error("   failed to download photo {}.jpg :(((", photoUrl.getId());
-                    }
-                });
-
+            if (entry.getValue().size() > 15) {
+                entry.getValue().parallelStream()
+                        .forEach(photoUrl -> downloadSinglePhoto(entry.getKey(), photoUrl));
             } else {
-                for (PhotoUrl photoUrl : entry.getValue()) {
-                    try {
-                        bufferedImage = ImageIO.read(new URL(photoUrl.getUrl()));
-                        ImageIO.write(bufferedImage, "jpg", new File("photos/" + entry.getKey() + "/" + i + ".jpg"));
-                        successCounter++;
-                        log.info("   photo {}.jpg downloaded successfully to folder \"{}\"...", i, entry.getKey());
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                        log.error("   failed to download photo {}.jpg :(((", i);
-                    } finally {
-                        i++;
-                    }
-                }
+                entry.getValue()
+                        .forEach(photoUrl -> downloadSinglePhoto(entry.getKey(), photoUrl));
             }
         }
-        log.info("Process completed: {} photos were downloaded", successCounter);
+        log.info("Process completed!");
     }
 
     private static Map<String, List<PhotoUrl>> getUrlsByAlbums(int userId, List<PhotoAlbumFull> desiredAlbums, boolean saveLinksToFile) throws ApiException, ClientException {
@@ -127,14 +114,12 @@ public class VkPhotoDownloader {
 
     private static Map<String, List<PhotoUrl>> getUrlsByAlbums(int userId, List<PhotoAlbumFull> desiredAlbums) throws ApiException, ClientException {
         log.info("Fetching links to photos...");
-        Map<String, List<PhotoUrl>> photoUrlsByAlbumsMap = new HashMap<>();
         int cycles;
+        String albumIdAsString;
+        Map<String, List<PhotoUrl>> photoUrlsByAlbumsMap = new HashMap<>();
+        List<String> photosList;
 
         for (PhotoAlbumFull photoAlbum : desiredAlbums) {
-            cycles = (int) Math.ceil((float) photoAlbum.getSize() / MAX_ITEMS_PER_REQUEST);
-            List<String> photosList = new ArrayList<>(photoAlbum.getSize());
-
-            String albumIdAsString;
             switch (photoAlbum.getId()) {
                 case -6:
                     albumIdAsString = "profile";
@@ -146,12 +131,14 @@ public class VkPhotoDownloader {
                     albumIdAsString = "saved";
                     break;
                 case -9000:
-                    albumIdAsString = "me"; // find out the proper tag!
+                    albumIdAsString = "me";     // find out the proper tag!
                     break;
                 default:
                     albumIdAsString = photoAlbum.getId().toString();
             }
 
+            cycles = (int) Math.ceil((float) photoAlbum.getSize() / MAX_ITEMS_PER_REQUEST);
+            photosList = new ArrayList<>(photoAlbum.getSize());
             for (int i = 0; i < cycles; i++) {
                 photosList.addAll(vk.photos().get(actor)
                         .ownerId(userId)
@@ -208,7 +195,6 @@ public class VkPhotoDownloader {
                                 }
                             }
                     );
-
                     log.info("   {} photos links from album \"{}\" saved to output.txt file", entry.getValue().size(), entry.getKey());
                 } catch (IOException e) {
                     e.printStackTrace();
