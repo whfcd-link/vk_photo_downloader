@@ -27,8 +27,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Scanner;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Slf4j(topic = "com.whfcd.vk_photo_downloader")
 public class VkPhotoDownloader {
@@ -59,15 +59,35 @@ public class VkPhotoDownloader {
     }
 
     public static void main(String[] args) throws ClientException, ApiException {
-        int userId = vk.users().get(actor).execute().get(0).getId();
-        List<PhotoAlbumFull> allAlbumsInfo = getAllAlbumsInfo(userId);
+        System.out.println("Step 1. Please, TYPE IN the id of VK-user OR VK-community OWNING the desired albums: \n " +
+                "  (NOTE: if it is community id - type it as a negative number, i. e. add the minus before the actual id!) ");
+        Scanner scanUserId = new Scanner(System.in);
+        int userId = scanUserId.hasNextInt() ?
+                scanUserId.nextInt() :
+                vk.users().get(actor).execute().get(0).getId();
+        List<PhotoAlbumFull> allAlbums = getAllAlbumsInfo(userId);
 
-        log.info("Getting ready to download photos from the following albums belonging to user with an id {}:", userId);
-        List<PhotoAlbumFull> desiredAlbums = allAlbumsInfo.stream()
-                .filter(x -> Stream.of(-15, -7, -6, 123586411)
-                        .anyMatch(y -> y.equals(x.getId())))
-                .peek(x -> log.info("   {}, id: {}, size: {}", x.getTitle(), x.getId(), x.getSize()))
-                .collect(Collectors.toList());
+        System.out.println("\nStep 2. Please, TYPE IN the ids of desired albums separated with whitespaces (see list above): \n" +
+                "  (For example:  -6 126038923 -7   )\n" +
+                "  (NOTE: After pressing ENT press CMD+D also to finish typing)\n" +
+                "  (NOTE: Do not provide anything (just terminate typing with CMD+D combination) if you want to download ALL THE ALBUMS)");
+        Scanner scanner = new Scanner(System.in);
+        List<Integer> nums = new ArrayList<>();
+        while (scanner.hasNextInt()) {
+            nums.add(scanner.nextInt());
+        }
+
+        log.info("Getting ready to download photos from the following albums belonging to owner with an id {}:", userId);
+        List<PhotoAlbumFull> desiredAlbums;
+        if (nums.isEmpty()) {
+            desiredAlbums = allAlbums;
+        } else {
+            desiredAlbums = allAlbums.stream()
+                    .filter(x -> nums.stream()
+                            .anyMatch(y -> y.equals(x.getId())))
+                    .collect(Collectors.toList());
+        }
+        desiredAlbums.forEach(x -> log.info("   {}, id: {}, size: {}", x.getTitle(), x.getId(), x.getSize()));
 
         downloadAllPhotos(getUrlsByAlbums(userId, desiredAlbums, true));
     }
@@ -138,6 +158,10 @@ public class VkPhotoDownloader {
                     albumIdAsString = photoAlbum.getId().toString();
             }
 
+            if (albumIdAsString.equals("me")) {
+                continue;
+            }
+
             cycles = (int) Math.ceil((float) photoAlbum.getSize() / MAX_ITEMS_PER_REQUEST);
             rawPhotosList = new ArrayList<>(photoAlbum.getSize());
             for (int i = 0; i < cycles; i++) {
@@ -177,7 +201,8 @@ public class VkPhotoDownloader {
                 .execute()
                 .getItems();
 
-        albumsInfo.forEach(x -> log.info("   {}, id: {}, size: {}", x.getTitle(), x.getId(), x.getSize()));
+        System.out.printf("List of all the albums of owner with id %d:\n", userId);
+        albumsInfo.forEach(x -> System.out.printf("   - %s, id: %d, size: %d%n", x.getTitle(), x.getId(), x.getSize()));
         return albumsInfo;
     }
 
