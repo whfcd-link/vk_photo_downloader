@@ -15,9 +15,4 @@ To use that app follow the simple steps:
    3.  After submitting you will be redirected to the page https://oauth.vk.com/blank.html. Find the property *access_token* in the URL, copy its value and past it as an *app.token* value to *application.properties* file (see step 3).
 
 5. Save chages of the *application.properties*
-6. Run the application... 
-
-
-***The current version downloads all the albums from profile from step 4.1. Options to choose will be provided soon***
-
-*Under the development*
+6. Run the application and follow the instructions given in console.
