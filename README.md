@@ -1,5 +1,5 @@
 # VK Photo Downloader
-A java-based appplication dedicated to download all the photos from specified albums from VK social network.
+Java-based console appplication dedicated to download all the photos from specified albums from VK social network.
 
 To use that app follow the simple steps:
 1. Clone the repository to your local machine
